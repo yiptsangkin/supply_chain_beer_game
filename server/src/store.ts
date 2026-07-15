@@ -135,10 +135,10 @@ export function getAllPlayerRoundStates(gameId: string, roundNumber: number): Re
 // ============================================================
 
 export function addOrderPipeline(entry: PipelineEntry): void {
-  if (!orderPipelines.has(entry.fromPlayerId)) {
-    orderPipelines.set(entry.fromPlayerId, []);
+  if (!orderPipelines.has(entry.toPlayerId)) {
+    orderPipelines.set(entry.toPlayerId, []);
   }
-  orderPipelines.get(entry.fromPlayerId)!.push(entry);
+  orderPipelines.get(entry.toPlayerId)!.push(entry);
 }
 
 export function getArrivingOrders(playerId: string, roundNumber: number): PipelineEntry[] {
