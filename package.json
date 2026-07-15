@@ -12,7 +12,7 @@
     "start:server": "npm run start -w server",
     "build:shared": "npm run build -w packages/shared",
     "build:server": "npm run build -w server",
-    "build:client": "npm run build -w client",
+    "build:client": "npm run build:prod -w client",
     "build": "npm run build:shared && npm run build:server && npm run build:client"
   }
 }
