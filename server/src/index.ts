@@ -118,14 +118,17 @@ const PORT = process.env.PORT || 3000;
 
 // Serve static frontend files in production
 const distPath = resolve(__dirname, '../../client/dist');
-if (existsSync(distPath)) {
-  app.use(express.static(distPath));
-  // SPA fallback: all non-API routes go to index.html
-  app.get(/^\/(?!api|socket\.io)/, (_req, res) => {
-    res.sendFile(resolve(distPath, 'index.html'));
-  });
-  console.log(`Serving static files from ${distPath}`);
-}
+app.use(express.static(distPath));
+// SPA fallback: all non-API routes go to index.html
+app.get(/^\/(?!api|socket\.io)/, (_req, res) => {
+  const indexPath = resolve(distPath, 'index.html');
+  if (existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(200).send('<!DOCTYPE html><html><body><h1>前端未构建</h1><p>请运行 npm run build:client</p></body></html>');
+  }
+});
+console.log(`Static files path: ${distPath}, exists: ${existsSync(distPath)}`);
 
 httpServer.listen(PORT, () => {
   console.log(`Beer Game server running on http://localhost:${PORT}`);
