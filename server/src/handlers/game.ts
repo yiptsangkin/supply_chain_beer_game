@@ -69,6 +69,7 @@ export function registerGameHandlers(socket: Socket, onUpdate?: () => void): voi
     const player = game.players.find((p) => p.id === data.playerId);
     if (player) {
       player.connected = true;
+      store.updatePlayerConnected(data.playerId, true);
       socket.join(data.gameId);
       socket.data.gameId = data.gameId;
       socket.data.playerId = data.playerId;

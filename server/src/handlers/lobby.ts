@@ -96,6 +96,7 @@ export function registerLobbyHandlers(socket: Socket, onUpdate?: () => void): vo
         const player = game.players.find((p) => p.id === playerId);
         if (player) {
           player.connected = false;
+          store.updatePlayerConnected(playerId, false);
         }
         socket.to(gameId).emit('player:left', playerId);
         socket.to(gameId).emit('lobby:updated', game);
@@ -119,6 +120,7 @@ export function registerLobbyHandlers(socket: Socket, onUpdate?: () => void): vo
     const player = game.players.find((p) => p.id === data.playerId);
     if (player) {
       player.connected = true;
+      store.updatePlayerConnected(data.playerId, true);
     }
     socket.emit('lobby:updated', game);
   });

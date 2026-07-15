@@ -10,85 +10,179 @@ import type {
   Role,
 } from '@beer-game/shared';
 import { ROLES } from '@beer-game/shared';
+import { getDb, saveDb } from './db.js';
 
 // ============================================================
-// 内存存储
+// SQLite 持久化存储
 // ============================================================
 
-const games = new Map<string, Game>();
-const playerStates = new Map<string, PlayerRoundState[]>(); // gameId:playerId -> round states
-const orderPipelines = new Map<string, PipelineEntry[]>(); // gameId -> pipeline entries
-const shipmentPipelines = new Map<string, PipelineEntry[]>(); // gameId -> pipeline entries
-const gameHistory = new Map<string, GameHistoryEntry[]>(); // gameId -> history entries
+function db() {
+  return getDb();
+}
+
+function toCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function rowToObj<T>(row: Record<string, unknown>): T {
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(row)) {
+    result[toCamel(key)] = row[key];
+  }
+  return result as T;
+}
 
 // ============================================================
 // Game CRUD
 // ============================================================
 
 export function saveGame(game: Game): void {
-  games.set(game.id, game);
+  db().run(
+    `INSERT OR REPLACE INTO games (id, code, status, current_round, total_rounds, consumer_demand, host_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [game.id, game.code, game.status, game.currentRound, game.totalRounds, JSON.stringify(game.consumerDemand), game.hostId]
+  );
+  // Also save players
+  for (const player of game.players) {
+    db().run(
+      `INSERT OR REPLACE INTO players (id, game_id, name, role, connected)
+       VALUES (?, ?, ?, ?, ?)`,
+      [player.id, game.id, player.name, player.role, player.connected ? 1 : 0]
+    );
+  }
+  saveDb();
 }
 
 export function getGame(gameId: string): Game | undefined {
-  return games.get(gameId);
-}
+  const stmt = db().prepare('SELECT * FROM games WHERE id = ?');
+  stmt.bind([gameId]);
+  if (!stmt.step()) return undefined;
+  const row = rowToObj<any>(stmt.getAsObject());
+  stmt.free();
 
-export function listAllGames(): Game[] {
-  return Array.from(games.values());
+  const game: Game = {
+    id: row.id,
+    code: row.code,
+    status: row.status,
+    currentRound: row.currentRound,
+    totalRounds: row.totalRounds,
+    consumerDemand: JSON.parse(row.consumerDemand),
+    players: getPlayers(gameId),
+    hostId: row.hostId,
+  };
+  return game;
 }
 
 export function getGameByCode(code: string): Game | undefined {
-  for (const game of games.values()) {
-    if (game.code === code) {
-      return game;
-    }
+  const stmt = db().prepare('SELECT id FROM games WHERE code = ?');
+  stmt.bind([code]);
+  if (!stmt.step()) {
+    stmt.free();
+    return undefined;
   }
-  return undefined;
+  const row = stmt.getAsObject() as { id: string };
+  stmt.free();
+  return getGame(row.id);
+}
+
+export function listAllGames(): Game[] {
+  const stmt = db().prepare('SELECT id FROM games ORDER BY rowid DESC');
+  const games: Game[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as { id: string };
+    const game = getGame(row.id);
+    if (game) games.push(game);
+  }
+  stmt.free();
+  return games;
 }
 
 export function deleteGame(gameId: string): void {
-  games.delete(gameId);
-  playerStates.delete(gameId);
-  orderPipelines.delete(gameId);
-  shipmentPipelines.delete(gameId);
-  gameHistory.delete(gameId);
+  db().run('DELETE FROM games WHERE id = ?', [gameId]);
+  db().run('DELETE FROM players WHERE game_id = ?', [gameId]);
+  db().run('DELETE FROM round_states WHERE player_id IN (SELECT id FROM players WHERE game_id = ?)', [gameId]);
+  db().run('DELETE FROM order_pipeline WHERE from_player_id IN (SELECT id FROM players WHERE game_id = ?)', [gameId]);
+  db().run('DELETE FROM shipment_pipeline WHERE from_player_id IN (SELECT id FROM players WHERE game_id = ?)', [gameId]);
+  db().run('DELETE FROM game_history WHERE game_id = ?', [gameId]);
+  saveDb();
 }
 
 // ============================================================
 // Player helpers
 // ============================================================
 
+function getPlayers(gameId: string): Player[] {
+  const stmt = db().prepare('SELECT id, name, role, connected FROM players WHERE game_id = ?');
+  stmt.bind([gameId]);
+  const players: Player[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as any;
+    players.push({
+      id: row.id,
+      name: row.name,
+      role: row.role || null,
+      connected: !!row.connected,
+    });
+  }
+  stmt.free();
+  return players;
+}
+
 export function addPlayerToGame(gameId: string, player: Player): Game | undefined {
-  const game = games.get(gameId);
-  if (!game) return undefined;
-  game.players.push(player);
-  return game;
+  db().run(
+    'INSERT INTO players (id, game_id, name, role, connected) VALUES (?, ?, ?, ?, ?)',
+    [player.id, gameId, player.name, player.role, player.connected ? 1 : 0]
+  );
+  saveDb();
+  return getGame(gameId);
+}
+
+export function updatePlayerRole(playerId: string, role: Role): void {
+  db().run('UPDATE players SET role = ? WHERE id = ?', [role, playerId]);
+  saveDb();
+}
+
+export function updatePlayerConnected(playerId: string, connected: boolean): void {
+  db().run('UPDATE players SET connected = ? WHERE id = ?', [connected ? 1 : 0, playerId]);
+  saveDb();
 }
 
 export function removePlayerFromGame(gameId: string, playerId: string): Game | undefined {
-  const game = games.get(gameId);
-  if (!game) return undefined;
-  game.players = game.players.filter((p) => p.id !== playerId);
-  return game;
+  db().run('DELETE FROM players WHERE id = ?', [playerId]);
+  saveDb();
+  return getGame(gameId);
 }
 
 export function findPlayerByRole(gameId: string, role: Role): Player | undefined {
-  const game = games.get(gameId);
-  if (!game) return undefined;
-  return game.players.find((p) => p.role === role);
+  const stmt = db().prepare('SELECT id, name, role, connected FROM players WHERE game_id = ? AND role = ?');
+  stmt.bind([gameId, role]);
+  if (!stmt.step()) {
+    stmt.free();
+    return undefined;
+  }
+  const row = stmt.getAsObject() as any;
+  stmt.free();
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role || null,
+    connected: !!row.connected,
+  };
 }
 
 export function getAvailableRoles(gameId: string): Role[] {
-  const game = games.get(gameId);
-  if (!game) return [];
-  const taken = new Set(game.players.map((p) => p.role));
+  const stmt = db().prepare('SELECT role FROM players WHERE game_id = ? AND role IS NOT NULL');
+  stmt.bind([gameId]);
+  const taken = new Set<string>();
+  while (stmt.step()) {
+    taken.add((stmt.getAsObject() as any).role);
+  }
+  stmt.free();
   return ROLES.filter((r) => !taken.has(r));
 }
 
 export function areAllRolesAssigned(gameId: string): boolean {
-  const game = games.get(gameId);
-  if (!game) return false;
-  return ROLES.every((r) => game.players.some((p) => p.role === r));
+  return getAvailableRoles(gameId).length === 0;
 }
 
 // ============================================================
@@ -96,37 +190,74 @@ export function areAllRolesAssigned(gameId: string): boolean {
 // ============================================================
 
 export function savePlayerRoundState(state: PlayerRoundState): void {
-  const key = `${state.playerId}`;
-  if (!playerStates.has(key)) {
-    playerStates.set(key, []);
-  }
-  const states = playerStates.get(key)!;
-  const idx = states.findIndex((s) => s.roundNumber === state.roundNumber);
-  if (idx >= 0) {
-    states[idx] = state;
-  } else {
-    states.push(state);
-  }
+  db().run(
+    `INSERT OR REPLACE INTO round_states
+     (player_id, round_number, role, incoming_order, incoming_shipment, inventory, backorder,
+      has_decided, order_quantity, holding_cost, shortage_cost, round_cost, cumulative_cost)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      state.playerId, state.roundNumber, state.role,
+      state.incomingOrder, state.incomingShipment, state.inventory, state.backorder,
+      state.hasDecided ? 1 : 0, state.orderQuantity,
+      state.holdingCost, state.shortageCost, state.roundCost, state.cumulativeCost,
+    ]
+  );
+  saveDb();
 }
 
 export function getPlayerRoundState(playerId: string, roundNumber: number): PlayerRoundState | undefined {
-  const states = playerStates.get(playerId);
-  if (!states) return undefined;
-  return states.find((s) => s.roundNumber === roundNumber);
+  const stmt = db().prepare('SELECT * FROM round_states WHERE player_id = ? AND round_number = ?');
+  stmt.bind([playerId, roundNumber]);
+  if (!stmt.step()) {
+    stmt.free();
+    return undefined;
+  }
+  const row = rowToObj<any>(stmt.getAsObject());
+  stmt.free();
+  return {
+    playerId: row.playerId,
+    role: row.role,
+    roundNumber: row.roundNumber,
+    incomingOrder: row.incomingOrder,
+    incomingShipment: row.incomingShipment,
+    inventory: row.inventory,
+    backorder: row.backorder,
+    hasDecided: !!row.hasDecided,
+    orderQuantity: row.orderQuantity,
+    holdingCost: row.holdingCost,
+    shortageCost: row.shortageCost,
+    roundCost: row.roundCost,
+    cumulativeCost: row.cumulativeCost,
+  };
 }
 
 export function getAllPlayerRoundStates(gameId: string, roundNumber: number): Record<Role, PlayerRoundState> {
-  const game = games.get(gameId);
-  if (!game) return {} as Record<Role, PlayerRoundState>;
+  const stmt = db().prepare(
+    `SELECT rs.* FROM round_states rs
+     JOIN players p ON rs.player_id = p.id
+     WHERE p.game_id = ? AND rs.round_number = ?`
+  );
+  stmt.bind([gameId, roundNumber]);
   const result: Partial<Record<Role, PlayerRoundState>> = {};
-  for (const player of game.players) {
-    if (player.role) {
-      const state = getPlayerRoundState(player.id, roundNumber);
-      if (state) {
-        result[player.role] = state;
-      }
-    }
+  while (stmt.step()) {
+    const row = rowToObj<any>(stmt.getAsObject());
+    result[row.role] = {
+      playerId: row.playerId,
+      role: row.role,
+      roundNumber: row.roundNumber,
+      incomingOrder: row.incomingOrder,
+      incomingShipment: row.incomingShipment,
+      inventory: row.inventory,
+      backorder: row.backorder,
+      hasDecided: !!row.hasDecided,
+      orderQuantity: row.orderQuantity,
+      holdingCost: row.holdingCost,
+      shortageCost: row.shortageCost,
+      roundCost: row.roundCost,
+      cumulativeCost: row.cumulativeCost,
+    };
   }
+  stmt.free();
   return result as Record<Role, PlayerRoundState>;
 }
 
@@ -134,36 +265,76 @@ export function getAllPlayerRoundStates(gameId: string, roundNumber: number): Re
 // Pipeline
 // ============================================================
 
+function toPipelineEntry(row: any): PipelineEntry {
+  return {
+    fromPlayerId: row.fromPlayerId,
+    toPlayerId: row.toPlayerId,
+    roundPlaced: row.roundPlaced,
+    roundArrives: row.roundArrives,
+    quantity: row.quantity,
+    processed: !!row.processed,
+  };
+}
+
 export function addOrderPipeline(entry: PipelineEntry): void {
-  if (!orderPipelines.has(entry.toPlayerId)) {
-    orderPipelines.set(entry.toPlayerId, []);
-  }
-  orderPipelines.get(entry.toPlayerId)!.push(entry);
+  db().run(
+    `INSERT INTO order_pipeline (from_player_id, to_player_id, round_placed, round_arrives, quantity, processed)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [entry.fromPlayerId, entry.toPlayerId, entry.roundPlaced, entry.roundArrives, entry.quantity, entry.processed ? 1 : 0]
+  );
+  saveDb();
 }
 
 export function getArrivingOrders(playerId: string, roundNumber: number): PipelineEntry[] {
-  const entries = orderPipelines.get(playerId);
-  if (!entries) return [];
-  return entries.filter((e) => e.roundArrives === roundNumber && !e.processed);
+  const stmt = db().prepare(
+    'SELECT * FROM order_pipeline WHERE to_player_id = ? AND round_arrives = ? AND processed = 0'
+  );
+  stmt.bind([playerId, roundNumber]);
+  const entries: PipelineEntry[] = [];
+  while (stmt.step()) {
+    entries.push(toPipelineEntry(rowToObj<any>(stmt.getAsObject())));
+  }
+  stmt.free();
+  return entries;
 }
 
 export function addShipmentPipeline(entry: PipelineEntry): void {
-  if (!shipmentPipelines.has(entry.toPlayerId)) {
-    shipmentPipelines.set(entry.toPlayerId, []);
-  }
-  shipmentPipelines.get(entry.toPlayerId)!.push(entry);
+  db().run(
+    `INSERT INTO shipment_pipeline (from_player_id, to_player_id, round_placed, round_arrives, quantity, processed)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [entry.fromPlayerId, entry.toPlayerId, entry.roundPlaced, entry.roundArrives, entry.quantity, entry.processed ? 1 : 0]
+  );
+  saveDb();
 }
 
 export function getArrivingShipments(playerId: string, roundNumber: number): PipelineEntry[] {
-  const entries = shipmentPipelines.get(playerId);
-  if (!entries) return [];
-  return entries.filter((e) => e.roundArrives === roundNumber && !e.processed);
+  const stmt = db().prepare(
+    'SELECT * FROM shipment_pipeline WHERE to_player_id = ? AND round_arrives = ? AND processed = 0'
+  );
+  stmt.bind([playerId, roundNumber]);
+  const entries: PipelineEntry[] = [];
+  while (stmt.step()) {
+    entries.push(toPipelineEntry(rowToObj<any>(stmt.getAsObject())));
+  }
+  stmt.free();
+  return entries;
 }
 
 export function markPipelineProcessed(entries: PipelineEntry[]): void {
+  // We don't have IDs stored in PipelineEntry, so update by columns
   for (const entry of entries) {
-    entry.processed = true;
+    db().run(
+      `UPDATE order_pipeline SET processed = 1
+       WHERE from_player_id = ? AND to_player_id = ? AND round_placed = ? AND round_arrives = ?`,
+      [entry.fromPlayerId, entry.toPlayerId, entry.roundPlaced, entry.roundArrives]
+    );
+    db().run(
+      `UPDATE shipment_pipeline SET processed = 1
+       WHERE from_player_id = ? AND to_player_id = ? AND round_placed = ? AND round_arrives = ?`,
+      [entry.fromPlayerId, entry.toPlayerId, entry.roundPlaced, entry.roundArrives]
+    );
   }
+  saveDb();
 }
 
 // ============================================================
@@ -171,14 +342,28 @@ export function markPipelineProcessed(entries: PipelineEntry[]): void {
 // ============================================================
 
 export function addGameHistory(gameId: string, entry: GameHistoryEntry): void {
-  if (!gameHistory.has(gameId)) {
-    gameHistory.set(gameId, []);
-  }
-  gameHistory.get(gameId)!.push(entry);
+  db().run(
+    `INSERT OR REPLACE INTO game_history (game_id, round_number, consumer_demand, player_states)
+     VALUES (?, ?, ?, ?)`,
+    [gameId, entry.roundNumber, entry.consumerDemand, JSON.stringify(entry.playerStates)]
+  );
+  saveDb();
 }
 
 export function getGameHistory(gameId: string): GameHistoryEntry[] {
-  return gameHistory.get(gameId) ?? [];
+  const stmt = db().prepare('SELECT * FROM game_history WHERE game_id = ? ORDER BY round_number');
+  stmt.bind([gameId]);
+  const entries: GameHistoryEntry[] = [];
+  while (stmt.step()) {
+    const row = rowToObj<any>(stmt.getAsObject());
+    entries.push({
+      roundNumber: row.roundNumber,
+      consumerDemand: row.consumerDemand,
+      playerStates: JSON.parse(row.playerStates),
+    });
+  }
+  stmt.free();
+  return entries;
 }
 
 // ============================================================
@@ -186,15 +371,22 @@ export function getGameHistory(gameId: string): GameHistoryEntry[] {
 // ============================================================
 
 export function computeGameResult(gameId: string): GameResult | undefined {
-  const game = games.get(gameId);
+  const game = getGame(gameId);
   if (!game) return undefined;
 
   const playerResults: PlayerResult[] = game.players
     .filter((p) => p.role !== null)
     .map((p) => {
-      const states = playerStates.get(p.id) ?? [];
-      const totalHoldingCost = states.reduce((sum, s) => sum + s.holdingCost, 0);
-      const totalShortageCost = states.reduce((sum, s) => sum + s.shortageCost, 0);
+      const stmt = db().prepare('SELECT SUM(holding_cost) as hc, SUM(shortage_cost) as sc FROM round_states WHERE player_id = ?');
+      stmt.bind([p.id]);
+      let totalHoldingCost = 0;
+      let totalShortageCost = 0;
+      if (stmt.step()) {
+        const row = stmt.getAsObject() as any;
+        totalHoldingCost = row.hc || 0;
+        totalShortageCost = row.sc || 0;
+      }
+      stmt.free();
       return {
         playerId: p.id,
         name: p.name,
@@ -206,11 +398,8 @@ export function computeGameResult(gameId: string): GameResult | undefined {
       };
     });
 
-  // Sort by total cost ascending (lowest cost = best)
   playerResults.sort((a, b) => a.totalCost - b.totalCost);
-  playerResults.forEach((p, i) => {
-    p.rank = i + 1;
-  });
+  playerResults.forEach((p, i) => { p.rank = i + 1; });
 
   return {
     gameId,

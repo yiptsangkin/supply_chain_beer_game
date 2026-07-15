@@ -89,6 +89,7 @@ export function selectRole(
   }
 
   player.role = role;
+  store.updatePlayerRole(playerId, role);
   return { game };
 }
 
@@ -107,6 +108,7 @@ export function startGame(gameId: string): { game: Game; roundState: RoundState 
   }
 
   game.status = 'active';
+  store.saveGame(game);
 
   // Initialize round 1 state
   const roundState = createInitialRoundState(game);
@@ -345,10 +347,12 @@ function processRound(game: Game, roundNumber: number): RoundState {
   // Step 6: Create next round state
   const nextRound = roundNumber + 1;
   game.currentRound = nextRound;
+  store.saveGame(game);
 
   // Check if game is over
   if (nextRound > game.totalRounds) {
     game.status = 'finished';
+    store.saveGame(game);
     const nextRoundState = createFinalRoundState(game, roundNumber);
     persistRoundState(game, nextRoundState);
     return nextRoundState;

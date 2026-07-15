@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
 import * as store from './store.js';
+import { initDb } from './db.js';
 
 // Catch unhandled errors
 process.on('uncaughtException', (err) => {
@@ -144,6 +145,10 @@ app.get(/^\/(?!api|socket\.io)/, (_req, res) => {
 });
 console.log(`Static files path: ${distPath}, exists: ${existsSync(distPath)}`);
 
-httpServer.listen(PORT, () => {
-  console.log(`Beer Game server running on http://localhost:${PORT}`);
+// Initialize database and start
+initDb().then(() => {
+  console.log('Database initialized');
+  httpServer.listen(PORT, () => {
+    console.log(`Beer Game server running on http://localhost:${PORT}`);
+  });
 });
