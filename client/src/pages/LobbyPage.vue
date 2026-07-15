@@ -134,10 +134,12 @@ on('game:state', (state: unknown) => {
 });
 
 function selectRole(role: Role) {
-  if (!gameStore.currentGame) return;
+  const game = gameStore.currentGame;
+  if (!game) return;
   emit('lobby:select_role', {
-    gameId: gameStore.currentGame.id,
+    gameId: game.id,
     role,
+    playerId: authStore.playerId,
   });
   gameStore.setRole(role);
 }

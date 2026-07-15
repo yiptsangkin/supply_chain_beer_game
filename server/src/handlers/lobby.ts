@@ -43,9 +43,9 @@ export function registerLobbyHandlers(socket: Socket, onUpdate?: () => void): vo
   });
 
   // Select role
-  socket.on('lobby:select_role', (data: { gameId: string; role: Role }) => {
+  socket.on('lobby:select_role', (data: { gameId: string; role: Role; playerId?: string }) => {
     try {
-      const playerId = socket.data.playerId;
+      const playerId = socket.data.playerId || data.playerId;
       if (!playerId) {
         socket.emit('error', { message: '未加入游戏', code: 'NOT_IN_GAME' });
         return;
