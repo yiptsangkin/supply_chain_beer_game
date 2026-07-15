@@ -128,7 +128,7 @@ io.on('connection', (socket) => {
   registerGameHandlers(socket, broadcastDashboardUpdate);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // Serve static frontend files in production
 const distPath = resolve(__dirname, '../../client/dist');
