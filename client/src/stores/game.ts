@@ -2,9 +2,21 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Game, Role, RoundState, PlayerRoundState, GameResult } from '@beer-game/shared';
 
+const STORAGE_KEY = 'beer_game_state';
+
+function loadFromStorage(): { gameId: string; role: Role | null } {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : { gameId: '', role: null };
+  } catch {
+    return { gameId: '', role: null };
+  }
+}
+
 export const useGameStore = defineStore('game', () => {
+  const saved = loadFromStorage();
   const currentGame = ref<Game | null>(null);
-  const myRole = ref<Role | null>(null);
+  const myRole = ref<Role | null>(saved.role);
   const roundState = ref<RoundState | null>(null);
   const gameResult = ref<GameResult | null>(null);
   const isHost = ref(false);
@@ -22,12 +34,16 @@ export const useGameStore = defineStore('game', () => {
     return roundState.value?.allDecided ?? false;
   });
 
+  const savedGameId = ref(saved.gameId);
+
   function setGame(game: Game) {
     currentGame.value = game;
+    saveToStorage();
   }
 
   function setRole(role: Role) {
     myRole.value = role;
+    saveToStorage();
   }
 
   function setRoundState(state: RoundState) {
@@ -38,12 +54,21 @@ export const useGameStore = defineStore('game', () => {
     gameResult.value = result;
   }
 
+  function saveToStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      gameId: currentGame.value?.id || savedGameId.value,
+      role: myRole.value,
+    }));
+  }
+
   function reset() {
     currentGame.value = null;
     myRole.value = null;
     roundState.value = null;
     gameResult.value = null;
     isHost.value = false;
+    savedGameId.value = '';
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   return {
@@ -52,6 +77,7 @@ export const useGameStore = defineStore('game', () => {
     roundState,
     gameResult,
     isHost,
+    savedGameId,
     myPlayerState,
     hasDecided,
     allDecided,

@@ -30,7 +30,7 @@ onMounted(() => {
     return;
   }
 
-  const gameId = window.location.pathname.split('/').pop();
+  const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
 
   // Request current state (even on refresh when store is empty)
   emit('round:request_state', { gameId });

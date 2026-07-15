@@ -152,7 +152,7 @@ function startGame() {
 // Request state on page refresh
 onMounted(() => {
   if (!gameStore.currentGame && authStore.isLoggedIn) {
-    const gameId = window.location.pathname.split('/').pop();
+    const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
     if (gameId) {
       emit('lobby:request_state', { gameId, playerId: authStore.playerId });
     }
