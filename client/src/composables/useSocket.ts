@@ -4,6 +4,7 @@ import { SERVER_URL } from '@/config';
 
 let socket: Socket | null = null;
 const connected = ref(false);
+const pendingHandlers: Array<{ event: string; handler: (...args: any[]) => void }> = [];
 
 export function useSocket() {
   function connect() {
@@ -21,6 +22,12 @@ export function useSocket() {
     socket.on('disconnect', () => {
       connected.value = false;
     });
+
+    // Replay pending handlers
+    for (const { event, handler } of pendingHandlers) {
+      socket.on(event, handler);
+    }
+    pendingHandlers.length = 0;
   }
 
   function disconnect() {
@@ -34,7 +41,11 @@ export function useSocket() {
   }
 
   function on(event: string, handler: (...args: any[]) => void) {
-    socket?.on(event, handler);
+    if (socket) {
+      socket.on(event, handler);
+    } else {
+      pendingHandlers.push({ event, handler });
+    }
   }
 
   function off(event: string, handler?: (...args: any[]) => void) {
