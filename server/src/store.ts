@@ -241,7 +241,7 @@ export function getAllPlayerRoundStates(gameId: string, roundNumber: number): Re
   const result: Partial<Record<Role, PlayerRoundState>> = {};
   while (stmt.step()) {
     const row = rowToObj<any>(stmt.getAsObject());
-    result[row.role] = {
+    result[row.role as Role] = {
       playerId: row.playerId,
       role: row.role,
       roundNumber: row.roundNumber,
