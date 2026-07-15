@@ -79,7 +79,7 @@ import { ROLES, ROLE_LABELS } from '@beer-game/shared';
 import type { Role, Game, Player, RoundState } from '@beer-game/shared';
 
 const router = useRouter();
-const { emit, on, off } = useSocket();
+const { emit, on, off, connect } = useSocket();
 const authStore = useAuthStore();
 const gameStore = useGameStore();
 
@@ -151,10 +151,14 @@ function startGame() {
 
 // Request state on page refresh
 onMounted(() => {
+  connect();
   if (!gameStore.currentGame && authStore.isLoggedIn) {
     const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
     if (gameId) {
-      emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+      // Wait for socket to connect before emitting
+      setTimeout(() => {
+        emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+      }, 500);
     }
   }
 });
