@@ -9,6 +9,20 @@ import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
 import * as store from './store.js';
 
+// Catch unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('FATAL - uncaughtException:', err.message);
+  console.error(err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('FATAL - unhandledRejection:', reason);
+});
+
+console.log('Starting server...');
+console.log('Node version:', process.version);
+console.log('CWD:', process.cwd());
+console.log('PORT env:', process.env.PORT);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const httpServer = createServer(app);
