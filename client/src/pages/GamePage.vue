@@ -20,7 +20,7 @@ import GameBoard from '@/components/game/GameBoard.vue';
 import type { Game, RoundState, GameResult } from '@beer-game/shared';
 
 const router = useRouter();
-const { on, emit, connect } = useSocket();
+const { on, emit, connect, connected } = useSocket();
 const authStore = useAuthStore();
 const gameStore = useGameStore();
 
@@ -33,16 +33,20 @@ onMounted(() => {
   }
 
   const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
+  if (!gameId) return;
 
-  // Wait for socket connection, then request state
-  setTimeout(() => {
-    emit('round:request_state', { gameId });
-
-    // If store is empty (page refresh), also request lobby state to restore game data
-    if (!gameStore.currentGame) {
-      emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+  // Wait for socket to connect before requesting state
+  const checkAndRequest = () => {
+    if (connected.value) {
+      emit('round:request_state', { gameId });
+      if (!gameStore.currentGame) {
+        emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+      }
+    } else {
+      setTimeout(checkAndRequest, 100);
     }
-  }, 500);
+  };
+  checkAndRequest();
 
   // Listen for state updates
   on('lobby:updated', (game: unknown) => {

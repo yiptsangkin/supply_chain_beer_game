@@ -79,7 +79,7 @@ import { ROLES, ROLE_LABELS } from '@beer-game/shared';
 import type { Role, Game, Player, RoundState } from '@beer-game/shared';
 
 const router = useRouter();
-const { emit, on, off, connect } = useSocket();
+const { emit, on, off, connect, connected } = useSocket();
 const authStore = useAuthStore();
 const gameStore = useGameStore();
 
@@ -154,15 +154,21 @@ function startGame() {
 // Request state on page refresh
 onMounted(() => {
   connect();
-  if (!gameStore.currentGame && authStore.isLoggedIn) {
-    const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
-    if (gameId) {
-      // Wait for socket to connect before emitting
-      setTimeout(() => {
-        emit('lobby:request_state', { gameId, playerId: authStore.playerId });
-      }, 500);
+
+  if (!authStore.isLoggedIn) return;
+
+  const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
+  if (!gameId) return;
+
+  // Wait for socket to connect before requesting state
+  const checkAndRequest = () => {
+    if (connected.value) {
+      emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+    } else {
+      setTimeout(checkAndRequest, 100);
     }
-  }
+  };
+  checkAndRequest();
 });
 </script>
 
