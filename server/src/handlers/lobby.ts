@@ -103,4 +103,23 @@ export function registerLobbyHandlers(socket: Socket, onUpdate?: () => void): vo
       }
     }
   });
+
+  // Request lobby state (for page refresh)
+  socket.on('lobby:request_state', (data: { gameId: string; playerId: string }) => {
+    const game = store.getGame(data.gameId);
+    if (!game) {
+      socket.emit('error', { message: '游戏不存在', code: 'GAME_NOT_FOUND' });
+      return;
+    }
+    // Rejoin the room and update socket data
+    socket.join(data.gameId);
+    socket.data.gameId = data.gameId;
+    socket.data.playerId = data.playerId;
+    // Mark player as connected
+    const player = game.players.find((p) => p.id === data.playerId);
+    if (player) {
+      player.connected = true;
+    }
+    socket.emit('lobby:updated', game);
+  });
 }

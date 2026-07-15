@@ -25,17 +25,26 @@ const authStore = useAuthStore();
 const gameStore = useGameStore();
 
 onMounted(() => {
-  if (!gameStore.currentGame || !authStore.playerId) {
+  if (!authStore.playerId) {
     router.push('/');
     return;
   }
 
-  // Request current state
-  emit('round:request_state', {
-    gameId: gameStore.currentGame.id,
-  });
+  const gameId = window.location.pathname.split('/').pop();
+
+  // Request current state (even on refresh when store is empty)
+  emit('round:request_state', { gameId });
+
+  // If store is empty (page refresh), also request lobby state to restore game data
+  if (!gameStore.currentGame) {
+    emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+  }
 
   // Listen for state updates
+  on('lobby:updated', (game: unknown) => {
+    gameStore.setGame(game as Game);
+  });
+
   on('game:state', (state: unknown) => {
     gameStore.setRoundState(state as RoundState);
   });

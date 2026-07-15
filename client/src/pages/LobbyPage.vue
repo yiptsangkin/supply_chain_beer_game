@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSocket } from '@/composables/useSocket';
 import { useAuthStore } from '@/stores/auth';
@@ -148,6 +148,16 @@ function startGame() {
     gameId: gameStore.currentGame.id,
   });
 }
+
+// Request state on page refresh
+onMounted(() => {
+  if (!gameStore.currentGame && authStore.isLoggedIn) {
+    const gameId = window.location.pathname.split('/').pop();
+    if (gameId) {
+      emit('lobby:request_state', { gameId, playerId: authStore.playerId });
+    }
+  }
+});
 </script>
 
 <style scoped>
