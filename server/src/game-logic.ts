@@ -64,7 +64,8 @@ export function joinGame(gameCode: string, playerName: string): { game: Game; pl
     connected: true,
   };
   store.addPlayerToGame(game.id, player);
-  return { game, player };
+  const updatedGame = store.getGame(game.id)!;
+  return { game: updatedGame, player };
 }
 
 export function selectRole(
@@ -90,7 +91,8 @@ export function selectRole(
 
   player.role = role;
   store.updatePlayerRole(playerId, role);
-  return { game };
+  const updatedGame = store.getGame(gameId)!;
+  return { game: updatedGame };
 }
 
 export function startGame(gameId: string): { game: Game; roundState: RoundState } | { error: string } {
