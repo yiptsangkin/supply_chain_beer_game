@@ -2,10 +2,14 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import { existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/game.js';
 import * as store from './store.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const httpServer = createServer(app);
 
@@ -111,6 +115,18 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Serve static frontend files in production
+const distPath = resolve(__dirname, '../../client/dist');
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+  // SPA fallback: all non-API routes go to index.html
+  app.get(/^\/(?!api|socket\.io)/, (_req, res) => {
+    res.sendFile(resolve(distPath, 'index.html'));
+  });
+  console.log(`Serving static files from ${distPath}`);
+}
+
 httpServer.listen(PORT, () => {
   console.log(`Beer Game server running on http://localhost:${PORT}`);
 });

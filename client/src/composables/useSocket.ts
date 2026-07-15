@@ -5,17 +5,7 @@ import { SERVER_URL } from '@/config';
 const socket = ref<Socket | null>(null);
 const connected = ref(false);
 
-export interface SocketComposable {
-  socket: ReturnType<typeof ref<Socket | null>>;
-  connected: ReturnType<typeof ref<boolean>>;
-  connect: () => void;
-  disconnect: () => void;
-  emit: (event: string, data: unknown) => void;
-  on: (event: string, handler: (...args: any[]) => void) => void;
-  off: (event: string, handler?: (...args: any[]) => void) => void;
-}
-
-export function useSocket(): SocketComposable {
+export function useSocket() {
   function connect() {
     if (socket.value?.connected) return;
 

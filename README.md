@@ -128,102 +128,51 @@ npm run dev:client
 
 ---
 
-## 部署到 Vercel
+## 一键部署到 Railway（推荐）
 
-由于啤酒游戏使用 WebSocket 实现实时通信，需要将**前端**和**后端**分开部署：
+[Railway](https://railway.app) 支持 WebSocket，可以将前后端部署到同一个服务，无需分开。
 
-- **前端** → Vercel（静态网站）
-- **后端** → Railway / Render（支持 WebSocket 长连接）
-
-### 一、部署前端到 Vercel
-
-#### 方式 1：Vercel CLI
-
-```bash
-# 安装 Vercel CLI
-npm i -g vercel
-
-# 登录
-vercel login
-
-# 部署（在项目根目录执行）
-vercel --prod
-```
-
-#### 方式 2：Vercel Dashboard
+### 部署步骤
 
 1. 推送代码到 GitHub
-2. 在 [vercel.com](https://vercel.com) 导入项目
-3. 设置：
+2. 打开 [railway.app](https://railway.app)，用 GitHub 登录
+3. 点击 **New Project → Deploy from GitHub repo**
+4. 选择 `supply_chain_beer_game` 仓库
+5. 设置：
+   - **Build Command**：`npm run build:client`
+   - **Start Command**：`npm run start:server`
+6. 点击 **Deploy**
+
+部署完成后，Railway 会分配一个域名（如 `xxx.up.railway.app`），直接访问即可。
+
+---
+
+## 分开部署（Vercel + Railway）
+
+如果需要前端用 Vercel、后端用 Railway，参见下方：
+
+### 部署前端到 Vercel
+
+1. 在 [vercel.com](https://vercel.com) 导入项目
+2. 设置：
    - **Framework Preset**: Vite
    - **Build Command**: `npm run build:client`
    - **Output Directory**: `client/dist`
-4. 添加环境变量：
-   - `VITE_SERVER_URL` = 你的后端 URL（如 `https://beer-game-api.railway.app`）
-5. 点击 Deploy
+3. 添加环境变量：`VITE_SERVER_URL` = 后端地址
+4. 点击 Deploy
 
-### 二、部署后端到 Railway
+### 部署后端到 Railway
 
-[Railway](https://railway.app) 支持 WebSocket，且有免费额度。
+1. 在 [railway.app](https://railway.app) 导入项目
+2. 设置 **Start Command**：`npm run start:server`
+3. 部署后获得后端 URL，填入 Vercel 的环境变量
 
-#### 方式 1：Railway CLI
-
-```bash
-# 安装 Railway CLI
-npm i -g @railway/cli
-
-# 登录
-railway login
-
-# 初始化（在项目根目录）
-railway init
-
-# 部署
-railway up
-```
-
-#### 方式 2：Railway Dashboard
-
-1. 推送代码到 GitHub
-2. 在 [railway.app](https://railway.app) 创建新项目
-3. 选择 "Deploy from GitHub repo"
-4. 设置：
-   - **Root Directory**: `/`
-   - **Start Command**: `npm run start:server`
-   - **Build Command**: `npm install`
-5. 部署后获得后端 URL（如 `beer-game-api.up.railway.app`）
-6. 将此 URL 设置为 Vercel 的 `VITE_SERVER_URL` 环境变量
-
-### 三、部署后端到 Render
-
-[Render](https://render.com) 也支持 WebSocket，免费计划有 750 小时/月。
-
-1. 在 [render.com](https://render.com) 创建新的 **Web Service**
-2. 连接 GitHub 仓库
-3. 设置：
-   - **Root Directory**: 留空
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm run start:server`
-4. 选择 Free 计划
-5. 部署后获得后端 URL（如 `beer-game.onrender.com`）
-6. 将此 URL 设置为 Vercel 的 `VITE_SERVER_URL` 环境变量
-
-### 四、关联前后端
-
-部署完成后，确保 Vercel 前端设置了正确的环境变量：
-
-```
-VITE_SERVER_URL=https://你的后端地址
-```
-
-（注意：URL 末尾不要加 `/`）
-
-### 五、部署命令速查
+### 部署命令速查
 
 | 命令 | 用途 |
 |------|------|
-| `npm run start:server` | Railway/Render 生产启动 |
-| `npm run build:client` | Vercel 构建命令 |
+| `npm run start:server` | 生产启动（自动托管前端静态文件） |
+| `npm run build:client` | 构建前端 |
 | `npm run dev:server` | 本地开发后端 |
 | `npm run dev:client` | 本地开发前端 |
 
