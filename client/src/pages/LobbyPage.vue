@@ -133,11 +133,25 @@ on('game:state', (state: unknown) => {
   router.push(`/game/${gameStore.currentGame!.id}`);
 });
 
+on('error', (err: unknown) => {
+  const e = err as { message: string };
+  console.error('Server error:', e.message);
+  error.value = e.message || '操作失败';
+});
+
 function selectRole(role: Role) {
-  const game = gameStore.currentGame;
-  if (!game) return;
+  const gameId = gameStore.currentGame?.id || gameStore.savedGameId;
+  console.log('selectRole called:', { role, gameId, playerId: authStore.playerId, connected: connected.value });
+  if (!gameId) {
+    console.error('selectRole: no gameId');
+    return;
+  }
+  if (!authStore.playerId) {
+    console.error('selectRole: no playerId');
+    return;
+  }
   emit('lobby:select_role', {
-    gameId: game.id,
+    gameId,
     role,
     playerId: authStore.playerId,
   });
