@@ -1,54 +1,47 @@
 import { io, type Socket } from 'socket.io-client';
-import { ref, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import { SERVER_URL } from '@/config';
 
-const socket = ref<Socket | null>(null);
+let socket: Socket | null = null;
 const connected = ref(false);
 
 export function useSocket() {
   function connect() {
-    if (socket.value?.connected) return;
+    if (socket?.connected) return;
 
-    const s = io(SERVER_URL, {
+    socket = io(SERVER_URL, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
     });
 
-    s.on('connect', () => {
+    socket.on('connect', () => {
       connected.value = true;
     });
 
-    s.on('disconnect', () => {
+    socket.on('disconnect', () => {
       connected.value = false;
     });
-
-    socket.value = s;
   }
 
   function disconnect() {
-    socket.value?.disconnect();
-    socket.value = null;
+    socket?.disconnect();
+    socket = null;
     connected.value = false;
   }
 
   function emit(event: string, data: unknown) {
-    socket.value?.emit(event, data);
+    socket?.emit(event, data);
   }
 
   function on(event: string, handler: (...args: any[]) => void) {
-    socket.value?.on(event, handler);
+    socket?.on(event, handler);
   }
 
   function off(event: string, handler?: (...args: any[]) => void) {
-    socket.value?.off(event, handler);
+    socket?.off(event, handler);
   }
 
-  onUnmounted(() => {
-    // Don't disconnect on unmount, keep connection alive across route changes
-  });
-
   return {
-    socket,
     connected,
     connect,
     disconnect,
