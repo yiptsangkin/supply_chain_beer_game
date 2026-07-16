@@ -16,11 +16,17 @@ export function useSocket() {
     });
 
     socket.on('connect', () => {
+      console.log('[Socket] connected');
       connected.value = true;
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      console.log('[Socket] disconnected:', reason);
       connected.value = false;
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[Socket] connect_error:', err.message);
     });
 
     // Replay pending handlers
