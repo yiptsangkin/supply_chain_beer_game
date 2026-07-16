@@ -6,7 +6,7 @@ const STORAGE_KEY = 'beer_game_state';
 
 function loadFromStorage(): { gameId: string; role: Role | null } {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = sessionStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : { gameId: '', role: null };
   } catch {
     return { gameId: '', role: null };
@@ -57,7 +57,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
       gameId: savedGameId.value,
       role: myRole.value,
     }));
@@ -70,7 +70,7 @@ export const useGameStore = defineStore('game', () => {
     gameResult.value = null;
     isHost.value = false;
     savedGameId.value = '';
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
   }
 
   return {

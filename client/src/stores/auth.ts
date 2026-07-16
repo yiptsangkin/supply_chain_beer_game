@@ -5,7 +5,7 @@ const STORAGE_KEY = 'beer_game_auth';
 
 function loadFromStorage(): { playerName: string; playerId: string } {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = sessionStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : { playerName: '', playerId: '' };
   } catch {
     return { playerName: '', playerId: '' };
@@ -21,7 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => playerName.value !== '' && playerId.value !== '');
 
   function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
       playerName: playerName.value,
       playerId: playerId.value,
     }));
@@ -36,7 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
   function reset() {
     playerName.value = '';
     playerId.value = '';
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
   }
 
   return {
