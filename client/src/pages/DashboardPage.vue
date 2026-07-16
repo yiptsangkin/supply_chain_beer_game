@@ -221,7 +221,7 @@ const comparisonOptions = {
 
 onMounted(() => {
   dashboardSocket = io(SERVER_URL + '/dashboard', {
-    transports: ['websocket', 'polling'],
+    transports: ['polling'],
   });
 
   dashboardSocket.on('dashboard:update', (data: GameSummary[]) => {

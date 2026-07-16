@@ -11,7 +11,7 @@ export function useSocket() {
     if (socket?.connected) return;
 
     socket = io(SERVER_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
     });
 
