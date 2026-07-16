@@ -38,6 +38,8 @@ export const useGameStore = defineStore('game', () => {
 
   function setGame(game: Game) {
     currentGame.value = game;
+    savedGameId.value = game.id;
+    myRole.value = null; // Reset role for new game
     saveToStorage();
   }
 
@@ -56,7 +58,7 @@ export const useGameStore = defineStore('game', () => {
 
   function saveToStorage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      gameId: currentGame.value?.id || savedGameId.value,
+      gameId: savedGameId.value,
       role: myRole.value,
     }));
   }
