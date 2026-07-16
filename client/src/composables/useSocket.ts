@@ -58,6 +58,14 @@ export function useSocket() {
     socket?.off(event, handler);
   }
 
+  function onConnect(cb: () => void) {
+    if (socket?.connected) {
+      cb();
+    } else {
+      on('connect', cb);
+    }
+  }
+
   return {
     connected,
     connect,
@@ -65,5 +73,6 @@ export function useSocket() {
     emit,
     on,
     off,
+    onConnect,
   };
 }

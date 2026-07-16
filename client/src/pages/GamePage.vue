@@ -4,7 +4,6 @@
       <p>加载游戏状态...</p>
       <p v-if="loadError" class="error-text mt-1">{{ loadError }}</p>
     </div>
-
     <template v-else>
       <GameBoard />
     </template>
@@ -12,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSocket } from '@/composables/useSocket';
 import { useAuthStore } from '@/stores/auth';
@@ -21,12 +20,12 @@ import GameBoard from '@/components/game/GameBoard.vue';
 import type { Game, RoundState, GameResult } from '@beer-game/shared';
 
 const router = useRouter();
-const { on, emit, connect, connected } = useSocket();
+const { on, emit, connect, onConnect } = useSocket();
 const authStore = useAuthStore();
 const gameStore = useGameStore();
 const loadError = ref('');
 
-// Register listeners in setup phase (before onMounted)
+// Register listeners in setup phase
 on('lobby:updated', (game: unknown) => {
   gameStore.setGame(game as Game);
 });
@@ -47,30 +46,22 @@ on('game:finished', (result: unknown) => {
 on('error', (err: unknown) => {
   const e = err as { message: string };
   loadError.value = e.message || '加载失败';
-  console.error('Game error:', e.message);
 });
 
-onMounted(() => {
-  connect();
+// Connect and request state
+connect();
 
-  if (!authStore.playerId) {
-    router.push('/');
-    return;
-  }
-
+if (!authStore.playerId) {
+  router.push('/');
+} else {
   const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
-  if (!gameId) return;
-
-  const checkAndRequest = () => {
-    if (connected.value) {
+  if (gameId) {
+    onConnect(() => {
       emit('round:request_state', { gameId });
       if (!gameStore.currentGame) {
         emit('lobby:request_state', { gameId, playerId: authStore.playerId });
       }
-    } else {
-      setTimeout(checkAndRequest, 100);
-    }
-  };
-  checkAndRequest();
-});
+    });
+  }
+}
 </script>

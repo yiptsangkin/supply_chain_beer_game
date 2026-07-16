@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSocket } from '@/composables/useSocket';
 import { useAuthStore } from '@/stores/auth';
@@ -79,7 +79,7 @@ import { ROLES, ROLE_LABELS } from '@beer-game/shared';
 import type { Role, Game, Player, RoundState } from '@beer-game/shared';
 
 const router = useRouter();
-const { emit, on, off, connect, connected } = useSocket();
+const { emit, on, connect, onConnect } = useSocket();
 const authStore = useAuthStore();
 const gameStore = useGameStore();
 
@@ -165,25 +165,17 @@ function startGame() {
   });
 }
 
-// Request state on page refresh
-onMounted(() => {
-  connect();
+// Connect and request state
+connect();
 
-  if (!authStore.isLoggedIn) return;
-
+if (authStore.isLoggedIn) {
   const gameId = gameStore.savedGameId || window.location.pathname.split('/').pop();
-  if (!gameId) return;
-
-  // Wait for socket to connect before requesting state
-  const checkAndRequest = () => {
-    if (connected.value) {
+  if (gameId) {
+    onConnect(() => {
       emit('lobby:request_state', { gameId, playerId: authStore.playerId });
-    } else {
-      setTimeout(checkAndRequest, 100);
-    }
-  };
-  checkAndRequest();
-});
+    });
+  }
+}
 </script>
 
 <style scoped>
